@@ -29,10 +29,41 @@ async function run() {
         const cartCollection = client.db('apartmentDB').collection('cart')
         const usersCollection = client.db('apartmentDB').collection('users')
 
+        // jwt related api 
+        app.post('/jwt', async (req, res) => {
+            const user = req.body;
+            const token = jwt.sign({
+                user
+            }, process.env.ACCESS_TOKEN_SECRET, { expiresIn: '1h' });
+            res.send({ token })   //{token : token}
+        })
+
+        // verify token - custom middleware
+        const verifyToken = (req, res, next) => {
+            console.log('inside verify token',req.headers);
+            if(!req.headers.authorization){
+               return res.status(401).send({message : 'forbidden access'})
+            }
+
+            const token = req.headers.authorization.split(' ')[1]
+            jwt.verify(token, process.env.ACCESS_TOKEN_SECRET , (err, decode) => {
+                if(err){
+               return res.status(401).send({message : 'forbidden access'})
+                }
+                else{
+                    req.decode = decode
+                }
+            })
+            next()
+        }
+
+
 
         // user 
 
-        app.get('/users', async(req, res) => {
+        app.get('/users', verifyToken, async (req, res) => {
+            // console.log(req.headers);
+
             const result = await usersCollection.find().toArray()
             res.send(result)
         })
@@ -40,10 +71,10 @@ async function run() {
         app.post('/users', async (req, res) => {
             const user = req.body;
             // checking unique email 
-            const query = {email : user.email}
+            const query = { email: user.email }
             const existingUser = await usersCollection.findOne(query)
-            if(existingUser){
-                return res.send({message : 'already exist', insertedId : null})
+            if (existingUser) {
+                return res.send({ message: 'already exist', insertedId: null })
             }
             const result = await usersCollection.insertOne(user)
             res.send(result)
@@ -57,17 +88,29 @@ async function run() {
             res.send(result)
         })
 
-app.patch('/users/admin/:id', async(req, res) => {
-    const id = req.params.id
-    const filter = { _id: new ObjectId(id) }
-    const updatedDoc = {
-        $set: {
-           role : 'admin'
-          },
-    }
-    const result = await usersCollection.updateOne(filter, updatedDoc)
-    res.send(result)
-})
+
+
+
+        // set admin role 
+
+        // app.get('/users/onlyAdmin', async(req, res) => {
+        //     // const role = req.query.role;
+        //     const result = await usersCollection.findOne({role:'admin'})
+        //     res.send(result)
+        // })
+
+
+        app.patch('/users/admin/:id', async (req, res) => {
+            const id = req.params.id
+            const filter = { _id: new ObjectId(id) }
+            const updatedDoc = {
+                $set: {
+                    role: 'admin'
+                },
+            }
+            const result = await usersCollection.updateOne(filter, updatedDoc)
+            res.send(result)
+        })
 
 
         // apartment 
