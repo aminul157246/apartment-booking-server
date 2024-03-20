@@ -26,12 +26,34 @@ async function run() {
 
         const apartmentCollection = client.db('apartmentDB').collection('apartments')
         const cartCollection = client.db('apartmentDB').collection('cart')
+        const usersCollection = client.db('apartmentDB').collection('users')
 
 
+        // user 
+
+        app.get('/users', async(req, res) => {
+            const result = await usersCollection.find().toArray()
+            res.send(result)
+        })
+
+        app.post('/users', async (req, res) => {
+            const user = req.body;
+            // checking unique email 
+            const query = {email : user.email}
+            const existingUser = await usersCollection.findOne(query)
+            if(existingUser){
+                return res.send({message : 'already exist', insertedId : null})
+            }
+            const result = await usersCollection.insertOne(user)
+            res.send(result)
+        })
+
+
+        // apartment 
         app.get('/apartments/:id', async (req, res) => {
             const id = req.params.id
             console.log(id);
-            const query = { _id : new ObjectId(id)}
+            const query = { _id: new ObjectId(id) }
             const result = await apartmentCollection.findOne(query)
             console.log(result);
             res.send(result)
@@ -50,9 +72,9 @@ async function run() {
             res.send(result)
         })
 
-        app.delete('/apartment/:id', async(req, res) => {
+        app.delete('/apartment/:id', async (req, res) => {
             const id = req.params.id;
-            const query = { _id : new ObjectId(id)}
+            const query = { _id: new ObjectId(id) }
             const result = await apartmentCollection.deleteOne(query)
             res.send(result)
         })
@@ -61,28 +83,28 @@ async function run() {
         // add in DB 
 
 
-        app.get('/carts' , async(req, res) => {
+        app.get('/carts', async (req, res) => {
             const email = req.query.email
             console.log(email);
-            const query = { "apartmentItem.email" : email}
+            const query = { "apartmentItem.email": email }
             const result = await cartCollection.find(query).toArray()
             res.send(result);
         })
 
 
-        app.post('/carts' , async(req, res) => {
+        app.post('/carts', async (req, res) => {
             const item = req.body
             const result = await cartCollection.insertOne(item)
             res.send(result)
         })
 
-        app.get('/carts/:id' , async(req, res) => {
+        app.get('/carts/:id', async (req, res) => {
             const id = req.params.id;
-            const query = { _id : new ObjectId(id)}
+            const query = { _id: new ObjectId(id) }
             const result = await cartCollection.deleteOne(query)
             res.send(result)
         })
-        
+
 
         await client.db("admin").command({ ping: 1 });
         console.log("Pinged your deployment. You successfully connected to MongoDB!");
