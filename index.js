@@ -34,32 +34,49 @@ async function run() {
             const user = req.body;
             const token = jwt.sign({
                 user
-            }, process.env.ACCESS_TOKEN_SECRET, { expiresIn: '1h' });
+            }, process.env.ACCESS_TOKEN_SECRET, { expiresIn: '5h' });
             res.send({ token })   //{token : token}
         })
 
         // verify token - custom middleware
         const verifyToken = (req, res, next) => {
-            console.log('inside verify token',req.headers);
-            if(!req.headers.authorization){
-               return res.status(401).send({message : 'forbidden access'})
+            console.log('inside verify token', req.headers?.authorization);
+            if (!req.headers.authorization) {
+                return res.status(401).send({ message: 'unauthorized access' })
             }
 
             const token = req.headers.authorization.split(' ')[1]
-            jwt.verify(token, process.env.ACCESS_TOKEN_SECRET , (err, decode) => {
-                if(err){
-               return res.status(401).send({message : 'forbidden access'})
+            console.log(token);
+            jwt.verify(token, process.env.ACCESS_TOKEN_SECRET, (err, decode) => {
+                if (err) {
+                    return res.status(401).send({ message: 'unauthorized access' })
                 }
-                else{
-                    req.decode = decode
-                }
+                req.decode = decode
+                next()
+
             })
-            next()
         }
 
 
+        const verifyAdmin = async (req, res, next) => {
+            const email = req.decode.email;
+
+            console.log('req.decode?.email', req.decode.email);    // undefined
+
+            const query = { email: email }
+            const user = await usersCollection.findOne(query)
+            const isAdmin = user?.role === 'admin'
+            if (!isAdmin) {
+                return res.status(403).send({ message: 'forbidden access' })
+
+            }
+            next()
+            // console.log(isAdmin);
+        }
+
 
         // user 
+
 
         app.get('/users', verifyToken, async (req, res) => {
             // console.log(req.headers);
@@ -67,6 +84,50 @@ async function run() {
             const result = await usersCollection.find().toArray()
             res.send(result)
         })
+
+
+
+
+
+        app.get('/users/admin/:email', verifyToken, verifyAdmin, async (req, res) => {
+            const email = req.params.email;
+            console.log(email);
+            if (email !== req.decode.email) {
+                return res.status(403).send({ message: 'unauthorized access' })
+            }
+
+            const query = { email: email }
+            const user = await usersCollection.findOne(query)
+            console.log(user);
+            let admin = false;
+            if (user) {
+                admin = user?.role === 'admin'
+            }
+            res.send({ admin })
+
+
+        })
+
+
+        // app.get('/users/admin/:email', async (req, res) => {
+        //     const email = req.params.email;
+        //     // console.log(email);
+        //     console.log(req.decode?.email);
+
+
+        //     const query = { email: email }
+        //     const user = await usersCollection.findOne(query)
+        //     console.log(user);
+        //     res.send({ isAdmin: user.role === 'admin' })
+
+
+
+        // })
+
+
+
+
+
 
         app.post('/users', async (req, res) => {
             const user = req.body;
@@ -80,9 +141,9 @@ async function run() {
             res.send(result)
         })
 
-        app.delete('/users/:id', async (req, res) => {
+        app.delete('/users/:id', verifyToken, verifyAdmin, async (req, res) => {
             const id = req.params.id;
-            console.log(id);
+            // console.log(id);
             const query = { _id: new ObjectId(id) }
             const result = await usersCollection.deleteOne(query)
             res.send(result)
@@ -93,14 +154,7 @@ async function run() {
 
         // set admin role 
 
-        // app.get('/users/onlyAdmin', async(req, res) => {
-        //     // const role = req.query.role;
-        //     const result = await usersCollection.findOne({role:'admin'})
-        //     res.send(result)
-        // })
-
-
-        app.patch('/users/admin/:id', async (req, res) => {
+        app.patch('/users/admin/:id', verifyToken, verifyAdmin, async (req, res) => {
             const id = req.params.id
             const filter = { _id: new ObjectId(id) }
             const updatedDoc = {
@@ -113,20 +167,26 @@ async function run() {
         })
 
 
+
+
+
+
+
+
         // apartment 
         app.get('/apartments/:id', async (req, res) => {
             const id = req.params.id
-            console.log(id);
+            // console.log(id);
             const query = { _id: new ObjectId(id) }
             const result = await apartmentCollection.findOne(query)
-            console.log(result);
+            // console.log(result);
             res.send(result)
         })
 
-
+        // all apartment get 
         app.get('/apartment', async (req, res) => {
             const result = await apartmentCollection.find().toArray()
-            console.log(result);
+            // console.log(result);
             res.send(result)
         })
 
@@ -143,13 +203,42 @@ async function run() {
             res.send(result)
         })
 
+        app.patch('/apartments/:id', async (req, res) => {
+            const item = req.body
+            console.log(item);
+            const id  = req.params.id
+            console.log(id);
+            const filter = { _id: new ObjectId(id) }
+            const updatedDoc = {
+                $set: {
+                    RentPrice : item.RentPrice,
+                    RentType : item.RentType,
+                    Description : item.Description,
+                    ParkingArea : item.ParkingArea,
+                    CeilingHeight : item.CeilingHeight,
+                    Renovation : item.Renovation,
+                    ConstructionYear : item.ConstructionYear,
+                    Furnishing : item.Furnishing,
+                    AdditionalSpace : item.AdditionalSpace,
+                    Bathrooms : item.Bathrooms,
+                    Bedrooms : item.Bedrooms,
+                    Address : item.Address,
+                    AdditionalValue : item.AdditionalValue,
+                    ApartmentName : item.ApartmentName,
+                    BlockName : item.BlockName,
+                    FloorNo : item.FloorNo,
+                }
+            }
+            const result = await apartmentCollection.updateOne(filter, updatedDoc)
+            res.send(result)
+        })
 
         // add in DB 
 
 
         app.get('/carts', async (req, res) => {
             const email = req.query.email
-            console.log(email);
+            // console.log(email);
             const query = { "apartmentItem.email": email }
             const result = await cartCollection.find(query).toArray()
             res.send(result);
