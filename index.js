@@ -57,27 +57,26 @@ async function run() {
             })
         }
 
+        // verify admin with query db email and  decode email 
+        // const verifyAdmin = async (req, res, next) => {
+        //     const email = req.decode?.user?.email;
 
-        const verifyAdmin = async (req, res, next) => {
-            const email = req.decode.email;
+        //     console.log('email', req.decode?.user?.email);    // undefined
 
-            console.log('req.decode?.email', req.decode.email);    // undefined
+        //     const query = { email: email }
+        //     const user = await usersCollection.findOne(query)
+        //     const isAdmin = user?.role === 'admin'
+        //     if (!isAdmin) {
+        //         return res.status(403).send({ message: 'forbidden access' })
 
-            const query = { email: email }
-            const user = await usersCollection.findOne(query)
-            const isAdmin = user?.role === 'admin'
-            if (!isAdmin) {
-                return res.status(403).send({ message: 'forbidden access' })
+        //     }
+        //     next()
+        // } 
 
-            }
-            next()
-            // console.log(isAdmin);
-        }
+
 
 
         // user 
-
-
         app.get('/users', verifyToken, async (req, res) => {
             // console.log(req.headers);
 
@@ -89,12 +88,13 @@ async function run() {
 
 
 
-        app.get('/users/admin/:email', verifyToken, verifyAdmin, async (req, res) => {
+        app.get('/users/admin/:email', verifyToken, async (req, res) => {
             const email = req.params.email;
-            console.log(email);
-            if (email !== req.decode.email) {
-                return res.status(403).send({ message: 'unauthorized access' })
-            }
+            // console.log(email);
+
+            // if (email !== req.decode?.user?.email) {
+            //     return res.status(403).send({ message: 'unauthorized access' })
+            // }
 
             const query = { email: email }
             const user = await usersCollection.findOne(query)
@@ -109,20 +109,7 @@ async function run() {
         })
 
 
-        // app.get('/users/admin/:email', async (req, res) => {
-        //     const email = req.params.email;
-        //     // console.log(email);
-        //     console.log(req.decode?.email);
 
-
-        //     const query = { email: email }
-        //     const user = await usersCollection.findOne(query)
-        //     console.log(user);
-        //     res.send({ isAdmin: user.role === 'admin' })
-
-
-
-        // })
 
 
 
@@ -141,7 +128,7 @@ async function run() {
             res.send(result)
         })
 
-        app.delete('/users/:id', verifyToken, verifyAdmin, async (req, res) => {
+        app.delete('/users/:id', verifyToken, async (req, res) => {
             const id = req.params.id;
             // console.log(id);
             const query = { _id: new ObjectId(id) }
@@ -154,7 +141,7 @@ async function run() {
 
         // set admin role 
 
-        app.patch('/users/admin/:id', verifyToken, verifyAdmin, async (req, res) => {
+        app.patch('/users/admin/:id', verifyToken, async (req, res) => {
             const id = req.params.id
             const filter = { _id: new ObjectId(id) }
             const updatedDoc = {
@@ -206,27 +193,27 @@ async function run() {
         app.patch('/apartments/:id', async (req, res) => {
             const item = req.body
             console.log(item);
-            const id  = req.params.id
+            const id = req.params.id
             console.log(id);
             const filter = { _id: new ObjectId(id) }
             const updatedDoc = {
                 $set: {
-                    RentPrice : item.RentPrice,
-                    RentType : item.RentType,
-                    Description : item.Description,
-                    ParkingArea : item.ParkingArea,
-                    CeilingHeight : item.CeilingHeight,
-                    Renovation : item.Renovation,
-                    ConstructionYear : item.ConstructionYear,
-                    Furnishing : item.Furnishing,
-                    AdditionalSpace : item.AdditionalSpace,
-                    Bathrooms : item.Bathrooms,
-                    Bedrooms : item.Bedrooms,
-                    Address : item.Address,
-                    AdditionalValue : item.AdditionalValue,
-                    ApartmentName : item.ApartmentName,
-                    BlockName : item.BlockName,
-                    FloorNo : item.FloorNo,
+                    RentPrice: item.RentPrice,
+                    RentType: item.RentType,
+                    Description: item.Description,
+                    ParkingArea: item.ParkingArea,
+                    CeilingHeight: item.CeilingHeight,
+                    Renovation: item.Renovation,
+                    ConstructionYear: item.ConstructionYear,
+                    Furnishing: item.Furnishing,
+                    AdditionalSpace: item.AdditionalSpace,
+                    Bathrooms: item.Bathrooms,
+                    Bedrooms: item.Bedrooms,
+                    Address: item.Address,
+                    AdditionalValue: item.AdditionalValue,
+                    ApartmentName: item.ApartmentName,
+                    BlockName: item.BlockName,
+                    FloorNo: item.FloorNo,
                 }
             }
             const result = await apartmentCollection.updateOne(filter, updatedDoc)
@@ -257,6 +244,20 @@ async function run() {
             const result = await cartCollection.deleteOne(query)
             res.send(result)
         })
+
+
+
+
+
+        // dashboard - admin 
+        app.get('/admin-status' , async(req, res) => {
+            const users = await usersCollection.estimatedDocumentCount()
+            const apartmentItems = await apartmentCollection.estimatedDocumentCount()
+            res.send({users, apartmentItems})
+
+        })
+
+
 
 
         await client.db("admin").command({ ping: 1 });
