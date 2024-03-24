@@ -40,13 +40,13 @@ async function run() {
 
         // verify token - custom middleware
         const verifyToken = (req, res, next) => {
-            console.log('inside verify token', req.headers?.authorization);
+            // console.log('inside verify token', req.headers?.authorization);
             if (!req.headers.authorization) {
                 return res.status(401).send({ message: 'unauthorized access' })
             }
 
             const token = req.headers.authorization.split(' ')[1]
-            console.log(token);
+            // console.log(token);
             jwt.verify(token, process.env.ACCESS_TOKEN_SECRET, (err, decode) => {
                 if (err) {
                     return res.status(401).send({ message: 'unauthorized access' })
@@ -98,7 +98,7 @@ async function run() {
 
             const query = { email: email }
             const user = await usersCollection.findOne(query)
-            console.log(user);
+            // console.log(user);
             let admin = false;
             if (user) {
                 admin = user?.role === 'admin'
@@ -172,7 +172,13 @@ async function run() {
 
         // all apartment get 
         app.get('/apartment', async (req, res) => {
-            const result = await apartmentCollection.find().toArray()
+            const page = parseInt(req.query.page);
+            const size = parseInt(req.query.size)
+            console.log(page, size);
+            const result = await apartmentCollection.find()
+                .skip(page * size)
+                .limit(size)
+                .toArray()
             // console.log(result);
             res.send(result)
         })
@@ -244,21 +250,21 @@ async function run() {
             const result = await cartCollection.deleteOne(query)
             res.send(result)
         })
-app.delete('/carts/:id', async(req, res) => {
-    const id = req.params.id
-    const query = {_id : new ObjectId(id)}
-    const result = await cartCollection.deleteOne(query)
-    res.send(result)
-})
+        app.delete('/carts/:id', async (req, res) => {
+            const id = req.params.id
+            const query = { _id: new ObjectId(id) }
+            const result = await cartCollection.deleteOne(query)
+            res.send(result)
+        })
 
 
 
 
         // dashboard - admin 
-        app.get('/admin-status' , async(req, res) => {
+        app.get('/admin-status', async (req, res) => {
             const users = await usersCollection.estimatedDocumentCount()
             const apartmentItems = await apartmentCollection.estimatedDocumentCount()
-            res.send({users, apartmentItems})
+            res.send({ users, apartmentItems })
 
         })
 
