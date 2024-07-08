@@ -4,13 +4,22 @@ const app = express()
 const jwt = require('jsonwebtoken')
 const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 require('dotenv').config()
-// const stripe = require('stripe')(process.env.PAYMENT_SK)
 const stripe = require('stripe')(process.env.PAYMENT_SK);
 const port = process.env.PORT || 5001;
+
+
+const SSLCommerzPayment = require('sslcommerz-lts')
+const store_id = 'abc6682aac6e7059'
+const store_passwd = 'abc6682aac6e7059@ssl'
+const is_live = false
+
 
 //middleware
 app.use(cors())
 app.use(express.json())
+
+
+
 
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.6v8amsy.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0`;
 
@@ -30,6 +39,7 @@ async function run() {
         const apartmentCollection = client.db('apartmentDB').collection('apartments')
         const cartCollection = client.db('apartmentDB').collection('cart')
         const usersCollection = client.db('apartmentDB').collection('users')
+        const paymentCollection = client.db('apartmentDB').collection('payment')
 
         // jwt related api 
         app.post('/jwt', async (req, res) => {
@@ -273,41 +283,123 @@ async function run() {
 
 
 
-        // app.post('/create-payment-intent', async(req, res) => {
-        //     const {price} = req.body
-        //     const amount = parseInt(price * 100)
 
-        //     console.log('amount', amount);
+        // payment 
 
-        //     const paymentIntent = await stripe.paymentIntents.create({
-        //         amount : amount,
-        //         currency : 'usd',
-        //         payment_method_types : ['card']
-        //     });
+        app.post('/form-data', (req, res) => {
 
-        //     res.send({
-        //         clientSecret : paymentIntent.client_secret
-        //     }) 
-        // })
+            // const id = req.params.id
+            // const query  = { _id : new ObjectId(id)}
+
+            const trans_id = new ObjectId().toString()
+            // console.log(trans_id);
+
+            const formInfo = req.body
+            console.log(formInfo.totalPrice);
 
 
-        app.post('/create-payment-intent', async (req, res) => {
-            const { price } = req.body;
-            console.log({price});
-            const amount = parseInt(price * 100);
-            console.log(amount, 'amount inside the intent')
-      
-            const paymentIntent = await stripe.paymentIntents.create({
-              amount: amount,
-              currency: 'usd',
-              payment_method_types: ['card']
+            const data = {
+                total_amount: formInfo.totalPrice,
+                currency: 'BDT',
+                tran_id: trans_id, // use unique tran_id for each api call
+                success_url: `http://localhost:5001/payment/success/${trans_id}`,
+                fail_url: `http://localhost:5001/payment/failed/${trans_id}`,
+                cancel_url: 'http://localhost:3030/cancel',
+                ipn_url: 'http://localhost:3030/ipn',
+                shipping_method: 'Courier',
+                product_name: 'Computer.',
+                product_category: 'Electronic',
+                product_profile: 'general',
+                cus_name: formInfo.name,
+                cus_email: formInfo.email,
+                cus_add1: 'Dhaka',
+                cus_add2: 'Dhaka',
+                cus_city: 'Dhaka',
+                cus_state: 'Dhaka',
+                cus_postcode: '1000',
+                cus_country: 'Bangladesh',
+                cus_phone: formInfo.phone,
+                cus_fax: '01711111111',
+                ship_name: 'Customer Name',
+                ship_add1: 'Dhaka',
+                ship_add2: 'Dhaka',
+                ship_city: 'Dhaka',
+                ship_state: 'Dhaka',
+                ship_postcode: 1000,
+                ship_country: 'Bangladesh',
+            };
+            
+
+            const sslcz = new SSLCommerzPayment(store_id, store_passwd, is_live)
+            sslcz.init(data).then(apiResponse => {
+                // Redirect the user to payment gateway
+                let GatewayPageURL = apiResponse.GatewayPageURL
+                res.send({ url: GatewayPageURL })
+
+
+                const finalPayment = {
+                    formInfo, paidStatus: false,
+                    transId: trans_id,
+                }
+
+                const result = paymentCollection.insertOne(finalPayment)
+                // res.send(result)
+
+                console.log('Redirecting to: ', GatewayPageURL)
             });
-            console.log(paymentIntent);
-      
-            res.send({
-              clientSecret: paymentIntent.client_secret
+
+
+            app.post('/payment/success/:transId', async (req, res) => {
+                console.log('post',req.params.transId);
+                const transId = req.params.transId
+                const result = await paymentCollection.updateOne(
+                    { transId },
+                    {
+                        $set: {
+                            paidStatus: true
+                        }
+                    })
+
+                if (result.modifiedCount > 0) {
+                    res.redirect(`http://localhost:5173/payment/success/${req.params.transId}`)
+                }
             })
-          });
+
+
+
+            // Fetch payment details based on transaction ID
+            // app.get('/payment/success/:transId', async (req, res) => {
+            //     const transId = req.params.transId;
+            //     console.log(" backend get" , transId);
+            //     const result = await paymentCollection.findOne({ transId : transId });
+            //     res.send(result)
+
+            // });
+
+
+
+            app.post('/payment/failed/:transId', async (req, res) => {
+                const result = await paymentCollection.deleteOne({ transId: req.params.transId })
+                if (result.deletedCount) {
+                    res.redirect(`http://localhost:5173/payment/failed/${req.params.transId}`)
+                }
+            })
+
+
+
+            console.log(data);
+        })
+
+
+        app.post('/form-data', async (req, res) => {
+            const formData = req.body
+            console.log("formData", formData);
+            const result = await paymentCollection.insertOne(formData)
+            res.send(result)
+            console.log(result);
+        })
+
+
 
 
 
